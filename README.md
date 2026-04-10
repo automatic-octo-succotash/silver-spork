@@ -18,6 +18,9 @@ Current source coverage:
 
 ```text
 .
+├── .dockerignore
+├── .github/workflows/publish-image.yml
+├── Dockerfile
 ├── Makefile
 ├── README.md
 └── migrations
@@ -51,6 +54,43 @@ export DATABASE_URL='postgres://user:password@localhost:5432/silver_spork?sslmod
 make migrate-up
 make migrate-down STEPS=1
 ```
+
+## Container Image
+
+This repo also publishes a Docker image to GHCR for use by a separate infra repository later. The image contains only:
+
+- the `migrate` CLI binary
+- the baked SQL files at `/migrations`
+
+Build locally:
+
+```bash
+docker build -t silver-spork-migrations .
+```
+
+Run locally against PostgreSQL:
+
+```bash
+export DATABASE_URL='postgres://user:password@host.docker.internal:5432/silver_spork?sslmode=disable'
+docker run --rm \
+  -e DATABASE_URL="$DATABASE_URL" \
+  silver-spork-migrations \
+  sh -lc 'migrate -path /migrations -database "$DATABASE_URL" up'
+```
+
+Use a database hostname that is reachable from the container runtime in your environment.
+
+The image defaults to `migrate -help`, so an infra repo can override the command for an init container or one-off Job without needing a wrapper script.
+
+## GHCR Publishing
+
+GitHub Actions builds and publishes `ghcr.io/<owner>/<repo>` from this repository:
+
+- pushes to `main` publish `latest`
+- every publish also gets an immutable commit SHA tag
+- pushed Git tags matching `v*` also publish that version tag
+
+This repository only produces the reusable migration artifact. A future infra repository can pull that image and decide when and how to execute the migrations.
 
 ## Schema Philosophy
 
