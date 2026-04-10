@@ -59,18 +59,22 @@ make migrate-down STEPS=1
 - Stores source payloads as fetched from RD Station CRM v2.
 - Preserves the original API response in `JSONB`.
 - Includes only minimal extracted fields needed for operational filtering and indexing.
+- Keeps the `crm.raw_deal_products` identifier assumption explicit and provisional until validated against live payloads from `GET /crm/v2/deals/{deal_id}/products`.
 - Supports replayable ETL and re-normalization without re-fetching historical source data.
 
 `crm.*`
 
 - Stores the normalized, queryable CRM model.
 - Uses explicit foreign keys and indexes so downstream API and ETL jobs can depend on stable relational contracts.
+- Keeps `crm.deals.owner_id` nullable so ETL is not brittle when owner assignment is missing or temporarily inconsistent during ingestion.
+- Enforces pipeline/stage consistency relationally so a deal cannot reference a stage from a different pipeline.
 - Is intended to be populated by idempotent upserts keyed on source identifiers.
 
 `derived.*`
 
 - Stores read-oriented analytical surfaces that may join or reshape normalized data across sources.
 - Starts with `derived.deal_metrics`, implemented as a materialized view because this repository owns schema only, not refresh orchestration.
+- Keeps only stable base facts and status-derived flags; dashboard windows such as current month and rolling 12 months should be computed at query or API time instead of being materialized as aging booleans.
 - The ETL or job runner is expected to refresh derived objects after normalized loads complete.
 
 ## ETL Expectations
@@ -80,6 +84,8 @@ Normalized tables are designed for idempotent ETL:
 - load source payloads into `crm.raw_*`
 - transform and upsert into `crm.*` using source IDs as stable keys
 - refresh `derived.deal_metrics`
+
+Normalized deal loads should tolerate missing owners and should only write `(stage_id, pipeline_id)` pairs that exist in `crm.pipeline_stages`.
 
 Typical loading order:
 

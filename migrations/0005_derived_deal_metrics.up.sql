@@ -3,6 +3,8 @@ BEGIN;
 -- A materialized view is used instead of a table because this repository owns
 -- schema only, not refresh orchestration or write paths. ETL can refresh this
 -- object after normalized loads and query a stable, indexed analytics surface.
+-- Time-windowed dashboard cuts such as "current month" or "last 12 months"
+-- should be computed at query time, not stored here as values that age.
 CREATE MATERIALIZED VIEW derived.deal_metrics AS
 SELECT
     d.id AS deal_id,
@@ -23,30 +25,25 @@ SELECT
     dp.quantity AS product_quantity,
     dp.amount AS product_amount,
     (d.status = 'won') AS is_won,
-    (d.status NOT IN ('won', 'lost')) AS is_ongoing,
-    (
-        d.status = 'won'
-        AND d.won_at >= date_trunc('month', CURRENT_TIMESTAMP)
-        AND d.won_at < date_trunc('month', CURRENT_TIMESTAMP) + INTERVAL '1 month'
-    ) AS won_current_month,
-    (
-        d.status = 'won'
-        AND d.won_at >= CURRENT_TIMESTAMP - INTERVAL '12 months'
-    ) AS won_last_12_months
+    (d.status NOT IN ('won', 'lost')) AS is_ongoing
 FROM crm.deals AS d
 JOIN crm.pipelines AS p
     ON p.id = d.pipeline_id
 JOIN crm.pipeline_stages AS ps
     ON ps.id = d.stage_id
-JOIN crm.users AS u
+   AND ps.pipeline_id = d.pipeline_id
+LEFT JOIN crm.users AS u
     ON u.id = d.owner_id
 LEFT JOIN crm.deal_products AS dp
     ON dp.deal_id = d.id
 LEFT JOIN crm.products AS pr
     ON pr.id = dp.product_id;
 
-COMMENT ON MATERIALIZED VIEW derived.deal_metrics IS 'Read-optimized deal fact surface for grouping by pipeline, stage, owner, and product.';
+COMMENT ON MATERIALIZED VIEW derived.deal_metrics IS 'Read-optimized deal fact surface for grouping by pipeline, stage, owner, and product. Relative time windows should be applied by downstream queries at API or dashboard time.';
 
+-- This remains safe because crm.deal_products has a primary key on
+-- (deal_id, product_id), so the view yields at most one row per pair, and at
+-- most one NULL product row for deals with no associated products.
 CREATE UNIQUE INDEX deal_metrics_deal_product_uniq_idx
     ON derived.deal_metrics (deal_id, product_id);
 CREATE INDEX deal_metrics_status_idx
@@ -63,9 +60,5 @@ CREATE INDEX deal_metrics_product_id_idx
     ON derived.deal_metrics (product_id);
 CREATE INDEX deal_metrics_ongoing_idx
     ON derived.deal_metrics (is_ongoing);
-CREATE INDEX deal_metrics_won_current_month_idx
-    ON derived.deal_metrics (won_current_month);
-CREATE INDEX deal_metrics_won_last_12_months_idx
-    ON derived.deal_metrics (won_last_12_months);
 
 COMMIT;

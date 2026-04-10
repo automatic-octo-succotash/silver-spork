@@ -82,7 +82,7 @@ CREATE TABLE crm.raw_deal_products (
     product_id TEXT
 );
 
-COMMENT ON TABLE crm.raw_deal_products IS 'Raw RD Station deal-product association payloads with extracted join keys.';
+COMMENT ON TABLE crm.raw_deal_products IS 'Raw RD Station deal-product association payloads with extracted join keys. The identifier shape is provisional and should be confirmed against live payloads from GET /crm/v2/deals/{deal_id}/products.';
 
 CREATE INDEX raw_deal_products_payload_gin_idx ON crm.raw_deal_products USING GIN (payload);
 CREATE INDEX raw_deal_products_deal_id_idx ON crm.raw_deal_products (deal_id);

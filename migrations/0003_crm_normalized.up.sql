@@ -30,6 +30,8 @@ CREATE TABLE crm.pipeline_stages (
     pipeline_id TEXT NOT NULL,
     name TEXT NOT NULL,
     position INTEGER NOT NULL,
+    CONSTRAINT pipeline_stages_id_pipeline_id_key
+        UNIQUE (id, pipeline_id),
     CONSTRAINT pipeline_stages_pipeline_id_fkey
         FOREIGN KEY (pipeline_id)
         REFERENCES crm.pipelines (id)
@@ -47,7 +49,7 @@ CREATE TABLE crm.deals (
     status TEXT NOT NULL,
     pipeline_id TEXT NOT NULL,
     stage_id TEXT NOT NULL,
-    owner_id TEXT NOT NULL,
+    owner_id TEXT,
     won_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
@@ -56,9 +58,9 @@ CREATE TABLE crm.deals (
         FOREIGN KEY (pipeline_id)
         REFERENCES crm.pipelines (id)
         ON DELETE RESTRICT,
-    CONSTRAINT deals_stage_id_fkey
-        FOREIGN KEY (stage_id)
-        REFERENCES crm.pipeline_stages (id)
+    CONSTRAINT deals_stage_id_pipeline_id_fkey
+        FOREIGN KEY (stage_id, pipeline_id)
+        REFERENCES crm.pipeline_stages (id, pipeline_id)
         ON DELETE RESTRICT,
     CONSTRAINT deals_owner_id_fkey
         FOREIGN KEY (owner_id)
@@ -66,7 +68,7 @@ CREATE TABLE crm.deals (
         ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE crm.deals IS 'Normalized RD Station deals for operational querying and downstream analytics.';
+COMMENT ON TABLE crm.deals IS 'Normalized RD Station deals for operational querying and downstream analytics. owner_id is nullable so ingestion stays resilient when owner assignment is absent or temporarily inconsistent in source data.';
 
 CREATE INDEX deals_status_idx ON crm.deals (status);
 CREATE INDEX deals_won_at_idx ON crm.deals (won_at);
