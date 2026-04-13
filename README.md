@@ -33,7 +33,9 @@ Current source coverage:
     ├── 0004_crm_sync_log.up.sql
     ├── 0004_crm_sync_log.down.sql
     ├── 0005_derived_deal_metrics.up.sql
-    └── 0005_derived_deal_metrics.down.sql
+    ├── 0005_derived_deal_metrics.down.sql
+    ├── 0006_crm_oauth.up.sql
+    └── 0006_crm_oauth.down.sql
 ```
 
 ## Running Migrations
@@ -137,6 +139,8 @@ Typical loading order:
 6. `crm.raw_deal_products`
 7. normalized upserts into `crm.*`
 8. refresh `derived.deal_metrics`
+
+Before the ETL worker can perform its first OAuth token rotation for RD Station CRM v2, `crm.oauth_state` must be seeded manually with the initial `access_token`, `refresh_token`, and an `expires_at` timestamp.
 
 ## Notes
 
